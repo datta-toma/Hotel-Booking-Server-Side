@@ -46,6 +46,24 @@ async function run() {
         res.send(result);
     })
 
+
+  //   // Route to handle booking
+  app.post('/Rooms/:id', async (req, res) => {
+    try {
+        const roomId = req.params.id;
+        // Update the availability status of the room in the database
+        await RoomsCollection.updateOne({ _id: new ObjectId(roomId) }, { $set: { availability: false } });
+        res.status(200).send({ message: "Room booked successfully!" });
+    } catch (error) {
+        console.error("Error booking room:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+});
+    
+
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
