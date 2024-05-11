@@ -31,6 +31,8 @@ async function run() {
     await client.connect();
 
     const RoomsCollection = client.db('hotelRoom').collection('Rooms');
+    const bookingCollection = client.db('hotelRoom').collection('booking');
+
 
     app.get('/Rooms', async(req, res)=>{
         const cursor = RoomsCollection.find();
@@ -47,11 +49,10 @@ async function run() {
     })
 
 
-  //   // Route to handle booking
+  //   handle booking
   app.post('/Rooms/:id', async (req, res) => {
     try {
         const roomId = req.params.id;
-        // Update the availability status of the room in the database
         await RoomsCollection.updateOne({ _id: new ObjectId(roomId) }, { $set: { availability: false } });
         res.status(200).send({ message: "Room booked successfully!" });
     } catch (error) {
@@ -59,6 +60,17 @@ async function run() {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+// bookings
+
+app.post('/bookings', async (req, res) => {
+    const booking = req.body;
+    const result = await bookingCollection.insertOne(booking);
+    res.send(result);
+});
+
+
+
     
 
 
