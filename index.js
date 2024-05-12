@@ -32,6 +32,7 @@ async function run() {
 
     const RoomsCollection = client.db('hotelRoom').collection('Rooms');
     const bookingCollection = client.db('hotelRoom').collection('booking');
+    const reviewCollection = client.db('hotelRoom').collection('reviews');
 
 
     app.get('/Rooms', async(req, res)=>{
@@ -79,13 +80,15 @@ async function run() {
       res.send(result);
   });
 
-  // delete 
-  app.delete('/bookings/:id', async(req, res) =>{
+
+  // DELETE a booking by ID
+  app.delete('/bookings/:id', async (req, res) => {
     const id = req.params.id;
-    const query = {_id: new ObjectId(id)}
+    const query = { _id: new ObjectId(id) };
     const result = await bookingCollection.deleteOne(query);
     res.send(result);
-  })
+  });
+
     
 
   // update
@@ -104,7 +107,23 @@ app.patch('/bookings/:id', async(req, res) => {
 });
 
 
+
+    app.get('/Rooms/:id/reviews/count', async (req, res) => {
+      const _id = req.params.id;
+      const query = { roomId: _id };
+      const result = await reviewCollection.countDocuments(query);
+      res.send({ totalReviews: result });
+    });
+
+    // POST route to save reviews
+    app.post('/reviews', async (req, res) => {
+      const { bookingId, review } = req.body;
+      const result = await reviewCollection.insertOne({ bookingId, review });
+      res.send(result);
+    });
     
+
+
 
 
 
