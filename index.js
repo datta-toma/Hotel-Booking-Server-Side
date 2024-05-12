@@ -107,20 +107,29 @@ app.patch('/bookings/:id', async(req, res) => {
 });
 
 
+app.get('/reviews', async(req, res)=>{
+  const cursor = reviewCollection.find();
+  const result = await cursor.toArray();
+  res.send(result);
+})
 
-    app.get('/Rooms/:id/reviews/count', async (req, res) => {
-      const _id = req.params.id;
-      const query = { roomId: _id };
-      const result = await reviewCollection.countDocuments(query);
-      res.send({ totalReviews: result });
-    });
+app.get('/reviews/:id', async(req, res)=>{
+  const id = req.params.id;
+  const query ={_id: new ObjectId(id)}
+  const result = await reviewCollection.findOne(query);
+  res.send(result);
+})
+
 
     // POST route to save reviews
     app.post('/reviews', async (req, res) => {
-      const { bookingId, review } = req.body;
-      const result = await reviewCollection.insertOne({ bookingId, review });
+      const { review } = req.body;
+      const result = await reviewCollection.insertOne(review );
       res.send(result);
     });
+
+ 
+
     
 
 
