@@ -9,9 +9,13 @@ const port = process.env.PORT || 5000;
 
 // middleware
 app.use(cors({
-  origin: ['http://localhost:5173'],
-  credentials: true
+  origin: ['http://localhost:5173',
+   'https://hotel-booking-f9fd3.web.app',
+    'https://hotel-booking-f9fd3.firebaseapp.com'],
+  credentials: true,
 }));
+
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -38,58 +42,99 @@ const client = new MongoClient(uri, {
   next();
 }
 
-const verifyToken = async(req, res, next) =>{
-  const token = req?.cookies?.token;
-  console.log('value of token', token)
-  if(!token){
-    return res.status(401).send({message: 'not authorized'})
-  }
-  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) =>{
-    //  error
-    if(err){
-      console.log(err);
-      return res.status(401).send({message: 'unauthorized'})
+
+// Middleware for token verification
+// const verifyToken = async(req, res, next) =>{
+//   const token = req?.cookies?.token;
+//   console.log('value of token', token)
+//   if(!token){
+//     return res.status(401).send({message: 'not authorized'})
+//   }
+//   if(token){
+
+//   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) =>{
+//     // Error handling
+//     if(err){
+//       console.log(err);
+//       return res.status(401).send({message: 'unauthorized'})
+//     }
+
+//     // If token is valid
+//     console.log('value in the token', decoded)
+//     req.user = decoded;
+//       next()
+   
+//   })
+// }
+
+// }
+
+
+
+// Middleware for token verification
+const verifyToken = async (req, res, next) => {
+  try {
+    const token = req.cookies?.token;
+
+    console.log('Value of token:', token);
+
+    if (!token) {
+      return res.status(401).send({ message: 'Not authorized' });
     }
 
-    // if token is valid then it would be decoded
-    console.log('value in the token', decoded)
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    console.log('Value in the token:', decoded);
+
     req.user = decoded;
-    next()
-  })
+    next();
+  } catch (error) {
+    console.error('Token verification error:', error);
+    return res.status(401).send({ message: 'Unauthorized' });
+  }
+};
 
-}
 
+
+
+// Middleware setup
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+};
 
 
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const RoomsCollection = client.db('hotelRoom').collection('Rooms');
     const bookingCollection = client.db('hotelRoom').collection('booking');
     const reviewCollection = client.db('hotelRoom').collection('reviews');
+    const offerCollection = client.db('hotelRoom').collection('offers');
 
-    // auth related api
-    app.post('/jwt', logger, async(req, res)=>{    
+    // auth JWT token  related api
+    app.post("/jwt", logger, async (req, res) => {
       const user = req.body;
-      console.log(user);
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {expiresIn: '1h'})
-      res
-      .cookie('token', token, {
-        httpOnly: true,
-        secure: true,
-        
+      console.log("user for token", user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '365d',
       })
-      .send({success: true})
-    })
+      res.cookie("token", token, cookieOptions).send({ success: true });
+    });
 
-    // logout
-    app.post('logout', async(req, res) =>{
+
+    
+    
+
+    // clearing token
+    app.post("/logout", async (req, res) => {
       const user = req.body;
-      console.log('login out', user);
-      res.clearCookie('token', {maxAge: 0}).send({success: true})
-    })
+      console.log("logging out", user);
+      res
+        .clearCookie("token", { ...cookieOptions, maxAge: 0 })
+        .send({ success: true });
+    });
 
     //  hotel related api
     app.get('/Rooms', logger, async(req, res)=>{
@@ -120,20 +165,19 @@ async function run() {
 });
 
 // bookings
-
-  app.get('/bookings', logger, verifyToken, async(req, res)=>{
-    console.log(req.query.email);
-    console.log('token page', req.cookies.token)
-    if(req.user.email !== req.query.email){
-      return res.status(403).send({message: 'forbidden access'})
-    }
-    let query = {};
-    if(req.query?.email){
-      query = {email: req.query.email}
-    }
-    const result = await bookingCollection.find(query).toArray();
+app.get('/bookings', logger, async (req, res) => {
+  try {
+    const userEmail = req.query.email; 
+   
+    
+    const result = await bookingCollection.find({ email: userEmail }).toArray(); 
     res.send(result);
-  })
+  } catch (error) {
+    console.error('Error fetching bookings:', error);
+  }
+});
+
+
 
   app.post('/bookings', async (req, res) => {
       const booking = req.body;
@@ -149,7 +193,6 @@ async function run() {
     const result = await bookingCollection.deleteOne(query);
     res.send(result);
   });
-
     
 
   // update
@@ -168,7 +211,7 @@ app.patch('/bookings/:id', async(req, res) => {
 });
 
 // review
-app.get('/reviews', async(req, res)=>{
+app.get('/reviews', logger,  async(req, res)=>{
   const cursor = reviewCollection.find();
   const result = await cursor.toArray();
   res.send(result);
@@ -182,13 +225,23 @@ app.get('/reviews/:id', async(req, res)=>{
 })
 
 
-
     // POST route to save reviews
+
     app.post('/reviews', async (req, res) => {
       const { review } = req.body;
       const result = await reviewCollection.insertOne(review );
       res.send(result);
     });
+
+
+    // offer 
+    app.get('/offers', logger, async(req, res)=>{
+      const cursor = offerCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+  })
+
+
 
  
 
@@ -196,7 +249,7 @@ app.get('/reviews/:id', async(req, res)=>{
 
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
